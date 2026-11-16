@@ -7,8 +7,9 @@
 #
 # --hook is for the commit-msg hook only: with `git commit -v` the message file
 # also holds the diff below a scissors line, which git discards, so that part
-# is skipped. Without --hook the whole text is checked, which is what stored
-# commit messages need: there, text after a scissors line is part of the message.
+# is skipped, but only when a diff really follows the line. Without --hook the
+# whole text is checked, which is what stored commit messages need: there, text
+# after a scissors line is part of the message.
 set -euo pipefail
 
 hook=0
@@ -28,8 +29,9 @@ pattern+='|(generated|created|written|authored)[[:space:]]+(with|by|using)[[:spa
 pattern+='|noreply@anthropic\.com'
 pattern+='|claude\.ai/code'
 
-if [[ "$hook" -eq 1 ]]; then
-  message="$(sed '/^# -\{24\} >8 -\{24\}$/,$d' "$1")"
+scissors='^# -\{24\} >8 -\{24\}$'
+if [[ "$hook" -eq 1 ]] && sed -n "/$scissors/,\$p" "$1" | grep '^diff --git ' > /dev/null; then
+  message="$(sed "/$scissors/,\$d" "$1")"
 else
   message="$(cat "$1")"
 fi

@@ -7,6 +7,9 @@
 # Usage: scripts/check-authorship.sh [<base>..<head>]   (default: origin/main..HEAD)
 set -euo pipefail
 
+# Replace refs could swap a commit for another one locally: ignore them.
+export GIT_NO_REPLACE_OBJECTS=1
+
 here="$(cd "$(dirname "$0")" && pwd)"
 range="${1:-origin/main..HEAD}"
 allowed_name='Sklyvan'

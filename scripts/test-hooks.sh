@@ -4,6 +4,13 @@
 # Tests for scripts/check-attribution.sh and scripts/check-authorship.sh.
 set -euo pipefail
 
+# Git exports GIT_DIR, GIT_INDEX_FILE and friends to hooks. This script runs
+# from the pre-commit hook and creates a throwaway repository: with those
+# variables set, its git commands would act on the real repository instead
+# (this happened in a linked worktree). Clear them before anything else.
+# shellcheck disable=SC2046
+unset $(git rev-parse --local-env-vars)
+
 scripts="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -60,6 +67,13 @@ owner_name='Sklyvan'
 owner_email='joangraciataribo@gmail.com'
 repo="$tmp/repo"
 git init -q -b main "$repo"
+
+# Refuse to continue unless every git command below acts on the throwaway
+# repository and nothing else.
+if [[ "$(cd "$repo" && git rev-parse --absolute-git-dir)" != "$(cd "$repo" && pwd -P)/.git" ]]; then
+  echo "error: the throwaway repository is not isolated from the real one" >&2
+  exit 2
+fi
 
 commit() { # <author name> <author email> <committer name> <committer email> <message file>
   GIT_AUTHOR_NAME="$1" GIT_AUTHOR_EMAIL="$2" GIT_COMMITTER_NAME="$3" GIT_COMMITTER_EMAIL="$4" \

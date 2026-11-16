@@ -34,6 +34,7 @@ licenses: ## Check that every file has license information (REUSE)
 
 test: ## Run the tests
 	scripts/test-hooks.sh
+	scripts/test-hooks-isolation.sh
 
 authorship: ## Check author, committer and attribution lines of BASE..HEAD
 	scripts/check-authorship.sh $(BASE)..HEAD

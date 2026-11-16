@@ -30,4 +30,5 @@ Local tools (Homebrew): `lefthook actionlint yamllint markdownlint-cli2 zizmor r
 - Tool versions are pinned in `scripts/install-ci-tools.sh` and the `Makefile`, and Dependabot does not track them: bump them by hand.
 - Dependency review (license allowlist in `.github/workflows/licenses.yml`) only runs in CI, so `make ci` cannot tell you that a new dependency has a license outside the list.
 - Dependabot pull requests fail the `authorship` check by design: re-commit the bump as Sklyvan on a branch and close the Dependabot pull request (see `Application/docs/adr/0002-dependabot-and-authorship.md`).
+- Tests and scripts that create a git repository must first clear the variables git exports to hooks (`unset $(git rev-parse --local-env-vars)`): inside a pre-commit hook, and above all in a linked worktree, `GIT_DIR` makes every git command act on the real repository. `scripts/test-hooks-isolation.sh` guards the hook tests against this.
 - Before every push: `git log --format='%an <%ae>%n%B' origin/main..HEAD`.

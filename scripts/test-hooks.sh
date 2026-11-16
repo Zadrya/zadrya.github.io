@@ -8,8 +8,16 @@ set -euo pipefail
 # from the pre-commit hook and creates a throwaway repository: with those
 # variables set, its git commands would act on the real repository instead
 # (this happened in a linked worktree). Clear them before anything else.
-# shellcheck disable=SC2046
-unset $(git rev-parse --local-env-vars)
+# The list is assigned first so that a failing `git rev-parse` aborts the script.
+local_git_vars="$(git rev-parse --local-env-vars)"
+# shellcheck disable=SC2086
+unset $local_git_vars
+for name in $local_git_vars; do
+  if [[ -n "${!name+set}" ]]; then
+    echo "error: $name is still set, refusing to create a throwaway repository" >&2
+    exit 2
+  fi
+done
 
 scripts="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"

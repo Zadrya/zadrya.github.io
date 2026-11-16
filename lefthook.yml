@@ -9,7 +9,7 @@ pre-commit:
 commit-msg:
   commands:
     attribution:
-      run: scripts/check-attribution.sh {1}
+      run: scripts/check-attribution.sh --hook {1}
     no-em-dash:
       run: scripts/check-no-em-dash.sh {1}
     commitlint:

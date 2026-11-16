@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Install once per clone with `lefthook install`.
+
+commit-msg:
+  commands:
+    attribution:
+      run: scripts/check-attribution.sh {1}

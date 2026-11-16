@@ -15,8 +15,10 @@ commit-msg:
     commitlint:
       run: make commitlint-message FILE={1}
 
+# A script, not a command: lefthook skips pre-push commands when the pushed
+# commits change no files. The script lives in .lefthook/pre-push/.
 pre-push:
-  commands:
-    protect-main-and-authorship:
-      run: scripts/pre-push.sh
+  scripts:
+    "protect-main-and-authorship.sh":
+      runner: bash
       use_stdin: true

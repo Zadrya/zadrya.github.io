@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+version = 1
+
+# Everything in this repository is GPL-3.0-or-later unless a file or a more
+# specific annotation says otherwise. Source files also carry an SPDX header.
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Zadrya contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"

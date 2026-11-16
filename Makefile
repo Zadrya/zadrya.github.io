@@ -26,7 +26,7 @@ lint: ## Lint workflows, YAML, Markdown and shell scripts
 	zizmor --no-progress .github/workflows
 	yamllint --strict .
 	markdownlint-cli2 "**/*.md"
-	shellcheck scripts/*.sh
+	shellcheck scripts/*.sh .lefthook/*/*.sh
 	scripts/check-no-em-dash.sh
 
 licenses: ## Check that every file has license information (REUSE)

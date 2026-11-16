@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Weekly and grouped, no automerge. Dependabot pull requests fail the authorship
+# check by design and are re-committed by the owner, see
+# https://github.com/Zadrya/Application/blob/main/docs/adr/0002-dependabot-and-authorship.md
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      github-actions:
+        patterns: ["*"]

@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+lefthook-local.yml
+.claude/settings.local.json

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+config:
+  MD013: false
+  MD024:
+    siblings_only: true
+ignores:
+  - LICENSE
+  - LICENSES/**
+  - CODE_OF_CONDUCT.md
+  - .fvm/**
+  - build/**
+  - node_modules/**

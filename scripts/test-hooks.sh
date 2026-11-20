@@ -164,6 +164,27 @@ range 2 'argument that is not a range' 'HEAD'
 range 0 'empty range outside a pull request' 'base..base'
 range 1 'empty range on a pull request' 'base..base' 'pull_request'
 
+# --- check-authorship.sh: replace refs are ignored ---------------------------
+
+disguise() { # <commit> <name> <email>: a copy of <commit> with another author and committer
+  GIT_AUTHOR_NAME="$2" GIT_AUTHOR_EMAIL="$3" GIT_COMMITTER_NAME="$2" GIT_COMMITTER_EMAIL="$3" \
+    git -C "$repo" commit-tree -p "$1^" -F "$tmp/msg" "$1^{tree}"
+}
+
+printf 'feat: add a thing\n' > "$tmp/msg"
+commit 'Claude' 'noreply@anthropic.com' 'Claude' 'noreply@anthropic.com' "$tmp/msg"
+foreign="$(git -C "$repo" rev-parse HEAD)"
+git -C "$repo" replace "$foreign" "$(disguise "$foreign" "$owner_name" "$owner_email")"
+report "$owner_name" "$(git -C "$repo" log -1 --format=%an HEAD)" 'replace ref: git log shows the disguise'
+range 1 'foreign commit disguised as the owner by a replace ref'
+git -C "$repo" replace -d "$foreign" > /dev/null
+
+owner_commit 'feat: add a thing'
+clean="$(git -C "$repo" rev-parse HEAD)"
+git -C "$repo" replace "$clean" "$(disguise "$clean" 'Claude' 'noreply@anthropic.com')"
+range 0 'owner commit replaced by a foreign one'
+git -C "$repo" replace -d "$clean" > /dev/null
+
 if [[ "$failures" -ne 0 ]]; then
   echo "$failures test(s) failed"
   exit 1

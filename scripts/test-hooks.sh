@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Tests for scripts/check-attribution.sh and scripts/check-authorship.sh.
+# Tests for scripts/check-attribution.sh, scripts/check-authorship.sh and the
+# pre-push hook (scripts/pre-push.sh through .lefthook/pre-push/).
 set -euo pipefail
 
 # Git exports GIT_DIR, GIT_INDEX_FILE and friends to hooks. This script runs
@@ -184,6 +185,104 @@ clean="$(git -C "$repo" rev-parse HEAD)"
 git -C "$repo" replace "$clean" "$(disguise "$clean" 'Claude' 'noreply@anthropic.com')"
 range 0 'owner commit replaced by a foreign one'
 git -C "$repo" replace -d "$clean" > /dev/null
+
+# --- pre-push hook: real pushes to a throwaway remote ------------------------
+
+# git itself writes the refs to the hook's standard input, so new branches,
+# updates and deletions arrive exactly as they do in a real clone.
+remote="$tmp/remote.git"
+work="$tmp/work"
+git init -q --bare -b main "$remote"
+# Without this the remote itself refuses to delete main, and the test of the
+# hook would pass whatever the hook does.
+git -C "$remote" config receive.denyDeleteCurrent ignore
+git init -q -b main "$work"
+if [[ "$(cd "$remote" && git rev-parse --absolute-git-dir)" != "$(cd "$remote" && pwd -P)" ||
+  "$(cd "$work" && git rev-parse --absolute-git-dir)" != "$(cd "$work" && pwd -P)/.git" ]]; then
+  echo "error: the throwaway remote or clone is not isolated from the real one" >&2
+  exit 2
+fi
+
+# The hook runs the copies, which are the scripts under test.
+cp -R "$scripts" "$work/scripts"
+mkdir -p "$work/.lefthook"
+cp -R "$scripts/../.lefthook/pre-push" "$work/.lefthook/pre-push"
+mkdir "$tmp/hooks"
+cat > "$tmp/hooks/pre-push" << EOF
+#!/usr/bin/env bash
+exec "$work/.lefthook/pre-push/protect-main-and-authorship.sh"
+EOF
+chmod +x "$tmp/hooks/pre-push"
+git -C "$work" config core.hooksPath "$tmp/hooks"
+git -C "$work" remote add origin "$remote"
+
+repo="$work" # the commit helpers above now act on the clone
+owner_commit 'chore: base'
+git -C "$work" push -q --no-verify origin main 2> /dev/null
+
+pushes() { # <accept|reject> <name> <git push arguments...>
+  local want="$1" name="$2" got=accept
+  shift 2
+  git -C "$work" push -q origin "$@" > /dev/null 2>&1 || got=reject
+  report "$want" "$got" "pre-push: $name"
+}
+
+on_remote() { # <branch>: prints the branch head on the remote, or "none"
+  git -C "$remote" rev-parse --verify --quiet "refs/heads/$1" || echo none
+}
+
+main_head="$(on_remote main)"
+
+git -C "$work" switch -q -c clean main
+echo change > "$work/file.txt"
+git -C "$work" add file.txt
+owner_commit 'feat: add a file'
+pushes accept 'clean new branch (zero remote SHA)' clean
+owner_commit 'fix: an empty commit on top'
+pushes accept 'clean update of an existing branch' clean
+
+git -C "$work" switch -q -c foreign main
+printf 'feat: add a thing\n' > "$tmp/msg"
+commit 'Claude' 'noreply@anthropic.com' "$owner_name" "$owner_email" "$tmp/msg"
+pushes reject 'empty commit with a foreign author' foreign
+report none "$(on_remote foreign)" 'pre-push: the refused branch is not on the remote'
+
+git -C "$work" switch -q -c committer main
+echo change > "$work/other.txt"
+git -C "$work" add other.txt
+commit "$owner_name" "$owner_email" 'GitHub' 'noreply@github.com' "$tmp/msg"
+pushes reject 'commit with changes and a foreign committer' committer
+
+git -C "$work" switch -q -c attributed main
+owner_commit 'feat: add a thing\n\nCo-Authored-By: Someone <someone@example.com>'
+pushes reject 'commit with an attribution line' attributed
+
+git -C "$work" switch -q -c session main
+owner_commit 'feat: add a thing\n\nClaude-Session: https://example.com/session'
+owner_commit 'fix: a clean commit on top'
+pushes reject 'attribution line below a clean commit' session
+
+# git leaves up-to-date refs off the hook input: push a new clean branch.
+git -C "$work" switch -q -c second clean
+owner_commit 'feat: add another thing'
+pushes reject 'two branches, the foreign one first' foreign second
+pushes reject 'two branches, the foreign one last' second foreign
+report none "$(on_remote second)" 'pre-push: no branch of a refused push is on the remote'
+
+main_case() { # <name> <git push arguments...>: main must stay where it was
+  pushes reject "$@"
+  report "$main_head" "$(on_remote main)" "pre-push: main is unchanged after: $1"
+  git -C "$remote" update-ref refs/heads/main "$main_head"
+}
+
+git -C "$work" switch -q main
+owner_commit 'feat: add a thing'
+main_case 'push to main' main
+main_case 'push of a clean feature branch to main' clean:main
+main_case 'deletion of main' --delete main
+
+pushes accept 'deletion of a branch (zero local SHA)' --delete clean
+report none "$(on_remote clean)" 'pre-push: the deleted branch is gone from the remote'
 
 if [[ "$failures" -ne 0 ]]; then
   echo "$failures test(s) failed"

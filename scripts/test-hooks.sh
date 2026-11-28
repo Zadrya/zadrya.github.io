@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Tests for scripts/check-attribution.sh, scripts/check-authorship.sh and the
-# pre-push hook (scripts/pre-push.sh through .lefthook/pre-push/).
+# Tests for scripts/check-attribution.sh, scripts/check-authorship.sh, the
+# pre-push hook (scripts/pre-push.sh through .lefthook/pre-push/) and
+# scripts/check-no-em-dash.sh.
 set -euo pipefail
 
 # Git exports GIT_DIR, GIT_INDEX_FILE and friends to hooks. This script runs
@@ -283,6 +284,73 @@ main_case 'deletion of main' --delete main
 
 pushes accept 'deletion of a branch (zero local SHA)' --delete clean
 report none "$(on_remote clean)" 'pre-push: the deleted branch is gone from the remote'
+
+# --- check-no-em-dash.sh: vendored files in a throwaway repository -----------
+
+em_dash="$(printf '\xe2\x80\x94')"
+em_repo="$tmp/em-dash"
+
+em_fresh() { # start a new, empty throwaway repository
+  rm -rf "$em_repo"
+  git init -q -b main "$em_repo"
+  if [[ "$(cd "$em_repo" && git rev-parse --absolute-git-dir)" != "$(cd "$em_repo" && pwd -P)/.git" ]]; then
+    echo "error: the em dash repository is not isolated from the real one" >&2
+    exit 2
+  fi
+}
+
+em_write() { # <path> <content>: write and track one file
+  mkdir -p "$(dirname "$em_repo/$1")"
+  printf '%s\n' "$2" > "$em_repo/$1"
+  git -C "$em_repo" add -- "$1"
+}
+
+# Exit codes: 0 no em dash found, 1 an em dash found, 2 the search failed.
+em_check() { # <wanted exit code> <name>
+  local got=0
+  (cd "$em_repo" && "$scripts/check-no-em-dash.sh" > /dev/null 2>&1) || got=$?
+  report "$1" "$got" "em dash: $2"
+}
+
+em_fresh
+em_write README.md 'plain text, with a comma'
+em_check 0 'no em dash anywhere'
+
+em_fresh
+em_write README.md "text $em_dash text"
+em_check 1 'em dash in a file we write'
+
+em_fresh
+em_write .gitattributes 'sources/** -text linguist-vendored'
+em_write sources/api/data.json "\"summary\": \"wiki $em_dash text\""
+em_check 0 'em dash in a vendored file under sources/'
+
+em_fresh
+em_write .gitattributes 'sources/base/** -text linguist-vendored'
+em_write sources/notes.md "notes $em_dash text"
+em_check 1 'em dash in an unvendored file under sources/'
+
+em_fresh
+em_write .gitattributes 'sources/** -text linguist-vendored'
+em_write dataset/.gitattributes '* linguist-vendored'
+em_write dataset/substances.json "\"name\": \"a $em_dash b\""
+em_check 1 'em dash outside sources/ marked vendored by a nested .gitattributes'
+
+em_fresh
+printf 'dataset/** linguist-vendored\n' > "$em_repo/.git/info/attributes"
+em_write dataset/substances.json "\"name\": \"a $em_dash b\""
+em_check 1 'em dash outside sources/ marked vendored by .git/info/attributes'
+
+em_fresh
+printf 'sources/** linguist-vendored\n' > "$em_repo/.git/info/attributes"
+em_write sources/api/data.json "\"summary\": \"wiki $em_dash text\""
+em_check 0 'em dash under sources/ marked vendored by .git/info/attributes'
+
+em_fresh
+printf '* linguist-vendored\n' > "$tmp/em-dash-attributes"
+git -C "$em_repo" config core.attributesFile "$tmp/em-dash-attributes"
+em_write README.md "text $em_dash text"
+em_check 1 'em dash outside sources/ marked vendored by core.attributesFile'
 
 if [[ "$failures" -ne 0 ]]; then
   echo "$failures test(s) failed"

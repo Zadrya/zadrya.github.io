@@ -2,7 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Fails if text contains the em dash (U+2014). Project style uses commas,
-# colons or parentheses instead.
+# colons or parentheses instead. Third-party text is skipped: the license
+# texts and the files under sources/ marked linguist-vendored (inputs stored
+# byte for byte, which are never edited). The exclusion only applies inside
+# sources/, so no attributes line can hide a file we write anywhere else.
 # Usage: scripts/check-no-em-dash.sh          checks every tracked text file
 #        scripts/check-no-em-dash.sh <file>   checks one file (a commit message)
 set -uo pipefail
@@ -12,7 +15,8 @@ em_dash="$(printf '\xe2\x80\x94')"
 if [[ $# -ge 1 ]]; then
   grep -n "$em_dash" "$1"
 else
-  git grep -nI "$em_dash" -- . ':!LICENSE' ':!LICENSES' ':!CODE_OF_CONDUCT.md'
+  git grep -nI "$em_dash" -- . ':!LICENSE' ':!LICENSES' ':!CODE_OF_CONDUCT.md' \
+    ':(exclude,attr:linguist-vendored)sources/'
 fi
 status=$?
 
